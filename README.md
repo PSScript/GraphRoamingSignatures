@@ -1,180 +1,197 @@
-# Manage-OutlookSignatures
+# Graph Roaming Signatures
 
-Enterprise email signature management for Microsoft 365 / Exchange Online via Microsoft Graph API.
+E-Mail-Signaturverwaltung für Microsoft 365 / Exchange Online über die Microsoft Graph API.
 
+> **Schnellstart für den täglichen Betrieb:** Siehe [Schnellstart.md](Schnellstart.md) — praxisnahe Anleitung für L1-Support, Azubis und alle, die Signatur-Tickets bearbeiten.
 
-> **Deutschsprachige Anleitung:** Siehe [Schnellstart.md](Schnellstart.md) für eine praxisnahe Anleitung (L1-Support, Azubis, täglicher Betrieb).
+---
 
-## Architecture & Strategy
+## Überblick
 
-Microsoft has **no official Graph API** for roaming signatures as of March 2026. This solution uses three complementary strategies:
+Dieses Projekt deployt HTML-E-Mail-Signaturen automatisiert in Exchange Online Postfächer.
+Es nutzt die **Graph Beta UserConfiguration API** (`MailboxConfigItem.ReadWrite`), die Microsoft
+im Januar 2026 veröffentlicht hat — nicht das veraltete `Set-MailboxMessageConfiguration`,
+das seit der Einführung von Roaming Signatures nicht mehr zuverlässig funktioniert.
 
-### Strategy 1: `Roaming` (recommended)
-Uses the **Graph Beta UserConfiguration API** (`MailboxConfigItem.ReadWrite`) released January 2026.
-Writes the `OWA.UserOptions` FAI (Folder Associated Item) in the Inbox to set signatures.
+### Kernfunktionen
 
-**Pro**: Works with New Outlook, OWA, and can coexist with roaming signatures.
-**Con**: Beta API, may change. Does not directly write substrate cloud settings (New Outlook reads from there).
+- **Multi-Company:** Unterschiedliche Vorlagen pro Tochterfirma, gesteuert über das Entra ID Feld `companyName`
+- **VIP-Overrides:** GFs/CEOs bekommen eigene Signaturen mit Foto, LinkedIn-Link, individueller Gestaltung
+- **Gruppen-Overrides:** Temporäre Kampagnen-Signaturen über Security Groups zuweisen
+- **Kampagnenbanner:** Optional unter jeder Signatur (480×96, 360×56 oder frei definierbar)
+- **Delta-Erkennung:** Graph `/users/delta` + SHA256-Prüfsumme in `extensionAttribute` — nur geänderte Benutzer werden versorgt
+- **Encoding-Handling:** Windows-1252 / ISO-8859-1 / UTF-8 / UTF-16 automatische Erkennung und Konvertierung
 
-### Strategy 2: `OWA` (legacy fallback)
-Uses the **EXO REST InvokeCommand** endpoint to call `Set-MailboxMessageConfiguration`.
+### Zuordnungs-Hierarchie
 
-**Pro**: Well-known, stable.
-**Con**: Only works if `PostponeRoamingSignaturesUntilLater = $true` (deprecated path).
+```
+VIP-Override (UPN)  →  Security Group  →  companyName  →  Standard-Vorlage
+     (1. Priorität)        (2.)              (3.)            (Fallback)
+```
 
-### Strategy 3: `TransportRule` (server-side)
-Creates Exchange Online transport rules that append signatures to outbound emails.
+Erste Übereinstimmung gewinnt.
 
-**Pro**: Works for ALL clients (Outlook, OWA, mobile, third-party). No client-side deployment.
-**Con**: No per-user personalization beyond Exchange built-in variables. Appended, not composed in client.
+---
 
-## Prerequisites
+## Dateien
 
-### Entra ID App Registration
-Run `Register-SignatureManagerApp.ps1` to create the app with all required permissions:
+| Datei | Beschreibung |
+|---|---|
+| `Set-GraphSignature.ps1` | **Hauptskript** — alles in einer Datei, Konfiguration inline oben im Skript |
+| `Invoke-SignatureAutomation.ps1` | Alternative mit externer `config.json` für komplexere Setups |
+| `Manage-OutlookSignatures.ps1` | Multi-Strategie-Engine (Roaming + OWA-Fallback + Transport Rules) |
+| `Register-SignatureManagerApp.ps1` | Entra ID App-Registrierung mit allen nötigen Berechtigungen |
+| `config.json` | Beispiel-Konfiguration für `Invoke-SignatureAutomation.ps1` |
+| `templates/corporate.htm` | Beispiel-HTML-Vorlage |
+| `designer/SignatureDesigner.jsx` | React-basierter WYSIWYG-Editor für Signatur-Vorlagen |
+| `Schnellstart.md` | Deutschsprachige Anleitung für den täglichen Betrieb |
+
+### Welches Skript nehmen?
+
+- **`Set-GraphSignature.ps1`** — für die meisten Umgebungen. Alles in einer Datei, keine externen Abhängigkeiten. Konfiguration direkt im Skript oben editieren.
+- **`Invoke-SignatureAutomation.ps1`** — wenn die Konfiguration in einer separaten JSON-Datei liegen soll (z.B. weil mehrere Admins daran arbeiten oder die Config in Git versioniert wird).
+- **`Manage-OutlookSignatures.ps1`** — wenn zusätzlich OWA-Fallback oder Transport Rules als Deployment-Strategie gebraucht werden.
+
+---
+
+## Voraussetzungen
+
+### Entra ID App-Registrierung
+
+Einmal ausführen:
 
 ```powershell
 .\Register-SignatureManagerApp.ps1 -AppName "Signature Manager" -CreateClientSecret
 ```
 
-Required Graph permissions (delegated + application):
+Oder manuell im [Entra Admin Center](https://entra.microsoft.com) anlegen.
 
-| Permission | Type | Purpose |
+### Benötigte Berechtigungen
+
+| Berechtigung | Typ | Wofür |
 |---|---|---|
-| `MailboxConfigItem.ReadWrite` | Delegated + App | Roaming signatures via UserConfiguration API |
-| `Mail.ReadWrite` | Delegated + App | Mailbox access |
-| `User.Read.All` | Delegated + App | User properties for template variables |
-| `MailboxSettings.ReadWrite` | Delegated + App | OOF and mailbox settings |
-| `Exchange.ManageAsApp` | Application | EXO InvokeCommand (transport rules, OWA fallback) |
+| `MailboxConfigItem.ReadWrite` | Delegiert + App | Roaming Signatures über UserConfiguration API |
+| `Mail.ReadWrite` | Delegiert + App | Postfachzugriff |
+| `User.Read.All` | Delegiert + App | Benutzerdaten für Variablen-Ersetzung |
+| `MailboxSettings.ReadWrite` | Delegiert + App | Abwesenheitsnachrichten |
+| `Exchange.ManageAsApp` | Application | Transport Rules, EXO InvokeCommand |
 
 ### PowerShell
-- PowerShell 7.x+ recommended (5.1 works for most features)
-- No external modules required — uses raw REST API calls
-- `Microsoft.Graph.Applications` only needed for `Register-SignatureManagerApp.ps1`
 
-## Usage
+- PowerShell 7.x+ empfohlen (5.1 funktioniert für die meisten Features)
+- Keine externen Module nötig — das Skript arbeitet direkt mit REST-Aufrufen
+- `Microsoft.Graph.Applications` nur für `Register-SignatureManagerApp.ps1` benötigt
 
-### Single user (interactive / delegated)
+---
+
+## Schnellstart
+
+### 1. App registrieren
+
 ```powershell
-.\Manage-OutlookSignatures.ps1 `
-    -TenantId "your-tenant-id" `
-    -ClientId "your-client-id" `
-    -TemplatePath ".\templates\corporate.htm" `
-    -UserUPN "user@contoso.com" `
-    -Strategy Roaming `
-    -SetAsDefault -SetForReply
+.\Register-SignatureManagerApp.ps1 -AppName "Signature Manager" -CreateClientSecret
 ```
 
-### All users (app-only / daemon)
+Die ausgegebene `ClientId` und `ClientSecret` notieren.
+
+### 2. Konfiguration anpassen
+
+In `Set-GraphSignature.ps1` die ersten Zeilen des Konfigurationsblocks anpassen:
+
 ```powershell
-.\Manage-OutlookSignatures.ps1 `
-    -TenantId "your-tenant-id" `
-    -ClientId "your-client-id" `
-    -ClientSecret "your-secret" `
-    -TemplatePath ".\templates\corporate.htm" `
-    -Strategy Roaming `
-    -SetAsDefault -SetForReply
+$TenantId     = 'eure-tenant-id'
+$ClientId     = 'eure-client-id'
+$ClientSecret = 'euer-secret'
+$PrimaryDomain = 'eure-domain.de'
 ```
 
-### Transport rule (server-side for all users)
+Firmen-Zuordnung, VIP-Overrides und Kampagnenbanner nach Bedarf konfigurieren.
+
+### 3. Testlauf
+
 ```powershell
-.\Manage-OutlookSignatures.ps1 `
-    -TenantId "your-tenant-id" `
-    -ClientId "your-client-id" `
-    -ClientSecret "your-secret" `
-    -TemplatePath ".\templates\corporate.htm" `
-    -Strategy TransportRule
+# Vorschau — ändert nichts
+.\Set-GraphSignature.ps1 -WhatIf
+
+# Einzelner Benutzer
+.\Set-GraphSignature.ps1 -UserUPN "test.user@eure-domain.de"
+
+# Alle Benutzer
+.\Set-GraphSignature.ps1
 ```
 
-### Dry run (preview without changes)
-```powershell
-.\Manage-OutlookSignatures.ps1 `
-    -TenantId "..." -ClientId "..." `
-    -TemplatePath ".\templates\corporate.htm" `
-    -UserUPN "user@contoso.com" `
-    -Strategy Roaming -DryRun
+### 4. Geplante Ausführung einrichten
+
+Task Scheduler, Azure Automation oder cron — täglich oder alle 4 Stunden.
+
+---
+
+## Variablen-Syntax
+
+Vorlagen verwenden `%Variable%`-Platzhalter:
+
+```html
+<td>%DisplayName%</td>
+<td>%JobTitle% · %Department%</td>
+<td>%Phone%</td>
+<td>%ExtensionAttribute7%</td>
 ```
 
-## Template Variables
+Vollständige Variablenliste: Siehe [Schnellstart.md](Schnellstart.md#verfügbare-variablen).
 
-Templates use `{{Variable}}` syntax. Variables are replaced with user data from Microsoft Graph.
+---
 
-| Variable | Graph Property | Description |
-|---|---|---|
-| `{{DisplayName}}` | `displayName` | Full name |
-| `{{GivenName}}` | `givenName` | First name |
-| `{{Surname}}` | `surname` | Last name |
-| `{{JobTitle}}` | `jobTitle` | Job title |
-| `{{Department}}` | `department` | Department |
-| `{{Mail}}` | `mail` | Primary email |
-| `{{Phone}}` | `businessPhones[0]` | Business phone |
-| `{{Phone2}}` | `businessPhones[1]` | Second business phone |
-| `{{Mobile}}` | `mobilePhone` | Mobile phone |
-| `{{Fax}}` | `faxNumber` | Fax number |
-| `{{Company}}` | `companyName` | Company name |
-| `{{Office}}` | `officeLocation` | Office location |
-| `{{Street}}` | `streetAddress` | Street address |
-| `{{City}}` | `city` | City |
-| `{{State}}` | `state` | State / province |
-| `{{PostalCode}}` | `postalCode` | Postal code |
-| `{{Country}}` | `country` | Country |
-| `{{ManagerName}}` | `manager.displayName` | Manager's name |
-| `{{ManagerMail}}` | `manager.mail` | Manager's email |
-| `{{ManagerTitle}}` | `manager.jobTitle` | Manager's title |
-| `{{ExtAttr1}}` – `{{ExtAttr15}}` | `onPremisesExtensionAttributes` | Extension attributes 1-15 |
+## Layout
 
-### Transport Rule Variables
-When using `Strategy TransportRule`, the `{{Variable}}` tokens are automatically converted to Exchange transport rule variables (`%%variable%%`).
-
-## Encoding Handling
-
-The script automatically detects and handles:
-
-| Encoding | Detection | Notes |
-|---|---|---|
-| **UTF-8** | BOM or default | Recommended for new templates |
-| **UTF-8 BOM** | Byte sequence `EF BB BF` | BOM is stripped during processing |
-| **Windows-1252** | Charset meta tag or byte heuristic (0x80-0x9F range) | Common in templates created with MS Word / Outlook |
-| **ISO-8859-1** | Charset meta tag or UTF-8 validation failure | Western European fallback |
-| **UTF-16 LE/BE** | BOM detection | Rare in HTML, fully supported |
-
-All templates are normalized to UTF-8 during processing. Smart quotes, em dashes, and other Windows-1252 specific characters are converted to HTML entities for maximum email client compatibility.
-
-## File Structure
+### Standard-Signatur
 
 ```
-signature-manager/
-├── Manage-OutlookSignatures.ps1       # Main deployment script
-├── Register-SignatureManagerApp.ps1    # Entra ID app registration
-├── templates/
-│   └── corporate.htm                  # Sample corporate signature template
-└── README.md                          # This file
+┌──────────────────────────────────────────────────────┐
+│                                          │           │
+│  Max Mustermann                          │  ┌─────┐  │
+│  SENIOR CONSULTANT                       │  │Logo │  │
+│                                          │  │oder │  │
+│  T  +49 711 123456-0                     │  │Foto │  │
+│  E  m.mustermann@contoso.com             │  └─────┘  │
+│                                          │ 240×160px │
+│  Contoso Group · Musterstr. 7 · 12345    │           │
+└──────────────────────────────────────────────────────┘
 ```
 
-## Relationship to Set-OutlookSignatures
+- **Links:** Kontaktdaten
+- **Rechts:** Logo (160×60) oder VIP-Foto (240×160)
+- **Trennlinie:** 3px vertikal in Akzentfarbe
 
-This tool complements [Set-OutlookSignatures](https://github.com/Set-OutlookSignatures/Set-OutlookSignatures) (the gold standard for PowerShell-based signature management). Key differences:
+### Kampagnenbanner (optional)
 
-| Feature | This Tool | Set-OutlookSignatures |
-|---|---|---|
-| Roaming cloud upload | Graph Beta UserConfiguration API | Benefactor Circle (paid) |
-| Template format | HTML only | Word (.docx) + HTML |
-| Variable source | Graph API only | Graph + AD + LDAP + files |
-| Transport rules | Built-in | Not included |
-| Platform | Server-side / headless | Client-side (runs on user's machine) |
-| Outlook add-in | Not included | Included (Benefactor Circle) |
-| Cost | Free / MIT | Free core + paid Benefactor Circle |
+| Größe | Verwendung |
+|---|---|
+| 480 × 96 px | Standard (Messen, Events) |
+| 360 × 56 px | Kompakt (Dauerkampagnen) |
+| 480 × 120 px | Groß (Produktlaunch) |
 
-For production environments managing thousands of users with complex assignment rules, **Set-OutlookSignatures with Benefactor Circle** is the recommended solution. This tool is designed for simpler deployments or as a starting point for custom integrations.
+---
 
-## References
+## Änderungserkennung
 
-- [Graph Beta UserConfiguration API (Jan 2026)](https://devblogs.microsoft.com/microsoft365dev/introducing-the-microsoft-graph-user-configuration-api-preview/)
-- [Migrating EWS UserConfiguration to Graph](https://glenscales.substack.com/p/migrating-ews-getuserconfiguration)
-- [Set-OutlookSignatures](https://github.com/Set-OutlookSignatures/Set-OutlookSignatures)
-- [Frank Carius — outlookcloudsettings substrate API](https://www.msxfaq.de/cloud/exchangeonline/betrieb/outlookcloudsettings.htm)
-- [Exchange Online InvokeCommand REST API](https://hajekj.net/2025/06/20/working-with-exchange-online-distribution-groups-via-rest/)
+Das Skript ist für den täglichen Betrieb optimiert:
 
-## License
+1. **Graph Delta Query** — fragt nur Benutzer ab, deren Daten sich seit dem letzten Lauf geändert haben
+2. **Prüfsumme** — SHA256 über alle signaturrelevanten Felder + Template-Hash, gespeichert in `extensionAttribute15` als `SIG:a3f2c1b98d21|2026-03-23T14:00Z`
+3. **Template-Änderung** — neues Template = neuer Hash = automatischer Re-Deploy aller betroffenen Benutzer
+
+Täglicher Lauf bei 5000 Benutzern: unter 2 Minuten (nur 10–20 tatsächliche Deployments).
+
+---
+
+## Verwandte Projekte
+
+- [Set-OutlookSignatures](https://github.com/Set-OutlookSignatures/Set-OutlookSignatures) — umfassende Client-seitige Lösung mit DOCX-Templates, Outlook-Add-In und Roaming Signature Sync (Benefactor Circle)
+- [Graph Beta UserConfiguration API](https://devblogs.microsoft.com/microsoft365dev/introducing-the-microsoft-graph-user-configuration-api-preview/) — die offizielle Microsoft-Dokumentation (Januar 2026)
+- [EWS → Graph Migration](https://glenscales.substack.com/p/migrating-ews-getuserconfiguration) — Hintergrundartikel zur UserConfiguration-Migration
+
+---
+
+## Lizenz
 
 MIT
