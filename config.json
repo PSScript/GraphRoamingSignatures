@@ -1,0 +1,85 @@
+{
+    "signatureNamePrefix": "Corporate",
+    "checksumAttribute": "extensionAttribute15",
+    "checksumPrefix": "SIG:",
+
+    "_comment_hierarchy": "Assignment order: vipOverrides > groupOverrides > companies > defaultTemplate (first match wins)",
+
+    "companies": {
+        "Contoso Group": {
+            "template": "./templates/contoso-group.htm",
+            "signatureName": "Contoso Group Signature"
+        },
+        "Contoso Cloud": {
+            "template": "./templates/contoso-cloud.htm",
+            "signatureName": "Contoso Cloud Signature"
+        },
+        "Contoso Solutions": {
+            "template": "./templates/contoso-solutions.htm",
+            "signatureName": "Contoso Solutions Signature"
+        },
+        "Fabrikam GmbH": {
+            "template": "./templates/fabrikam.htm",
+            "signatureName": "Fabrikam Signature"
+        },
+        "Northwind GmbH": {
+            "template": "./templates/northwind.htm",
+            "signatureName": "Northwind Signature"
+        }
+    },
+
+    "groupOverrides": {
+        "SG-Signature-Marketing-Q2": {
+            "template": "./templates/marketing-campaign-q2.htm",
+            "signatureName": "Marketing Campaign Q2 2026",
+            "groupId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            "_comment": "Time-limited campaign banner appended to normal signature"
+        },
+        "SG-Signature-Recruiting": {
+            "template": "./templates/recruiting.htm",
+            "signatureName": "Recruiting Signature",
+            "groupId": "11111111-2222-3333-4444-555555555555",
+            "_comment": "HR team gets a We are hiring banner"
+        }
+    },
+
+    "vipOverrides": {
+        "ceo@contoso.com": {
+            "template": "./templates/vip/ceo.htm",
+            "signatureName": "CEO Signature",
+            "_comment": "Personal LinkedIn QR, portrait photo, special layout"
+        },
+        "md.north@contoso-cloud.com": {
+            "template": "./templates/vip/md-north.htm",
+            "signatureName": "MD North Signature",
+            "_comment": "MD wants different font + personal LinkedIn"
+        },
+        "md.south@contoso-cloud.com": {
+            "template": "./templates/vip/md-south.htm",
+            "signatureName": "MD South Signature",
+            "_comment": "MD wants location photo in signature"
+        },
+        "md@fabrikam.com": {
+            "template": "./templates/vip/md-fabrikam.htm",
+            "signatureName": "Fabrikam MD Signature"
+        }
+    },
+
+    "defaultTemplate": {
+        "template": "./templates/default.htm",
+        "signatureName": "Standard Signature",
+        "_comment": "Fallback for users whose companyName doesn't match any entry"
+    },
+
+    "excludeUPNs": [
+        "admin@contoso.com",
+        "noreply@contoso.com",
+        "servicedesk@contoso.com",
+        "postmaster@contoso.com"
+    ],
+
+    "excludeCompanyNames": [
+        "Service Accounts",
+        "Test Accounts"
+    ]
+}
