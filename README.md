@@ -2,6 +2,9 @@
 
 Enterprise email signature management for Microsoft 365 / Exchange Online via Microsoft Graph API.
 
+
+> **Deutschsprachige Anleitung:** Siehe [Schnellstart.md](Schnellstart.md) für eine praxisnahe Anleitung (L1-Support, Azubis, täglicher Betrieb).
+
 ## Architecture & Strategy
 
 Microsoft has **no official Graph API** for roaming signatures as of March 2026. This solution uses three complementary strategies:
