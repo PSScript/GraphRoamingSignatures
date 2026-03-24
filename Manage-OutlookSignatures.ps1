@@ -11,7 +11,7 @@
 
     Requires Entra ID App Registration with:
       - MailboxConfigItem.ReadWrite (delegated or app)
-      - Mail.ReadWrite (delegated or app)
+      # Mail.ReadWrite NOT needed — inbox is a well-known folder name
       - User.Read.All (delegated or app)
       - MailboxSettings.ReadWrite (delegated or app)
 
@@ -263,7 +263,7 @@ function Get-GraphToken {
 
     $scopes = @(
         'https://graph.microsoft.com/MailboxConfigItem.ReadWrite'
-        'https://graph.microsoft.com/Mail.ReadWrite'
+
         'https://graph.microsoft.com/User.Read.All'
         'https://graph.microsoft.com/MailboxSettings.ReadWrite'
     )
@@ -557,9 +557,7 @@ function Set-RoamingSignature {
     Write-Log "  [Roaming] Setting signature for ${UserUPN} via Graph Beta UserConfiguration API"
 
     # Step 1: Get the Inbox folder ID
-    $inbox = Invoke-GraphRequest -Uri "/users/${UserUPN}/mailFolders/inbox" -Beta
-    $inboxId = $inbox.id
-    Write-Log "    Inbox folder ID: $inboxId"
+    # inbox is a well-known folder name — no Mail.ReadWrite needed
 
     # Step 2: Try to read existing OWA.UserOptions UserConfiguration
     $configName = 'OWA.UserOptions'
@@ -567,7 +565,7 @@ function Set-RoamingSignature {
 
     try {
         $existingConfig = Invoke-GraphRequest `
-            -Uri "/users/${UserUPN}/mailFolders/${inboxId}/userConfigurations/${configName}" `
+            -Uri "/users/${UserUPN}/mailFolders/inbox/userConfigurations/${configName}" `
             -Beta
         Write-Log "    Existing UserConfiguration found: $configName"
     }
@@ -628,7 +626,7 @@ function Set-RoamingSignature {
             try {
                 Invoke-GraphRequest `
                     -Method PATCH `
-                    -Uri "/users/${UserUPN}/mailFolders/${inboxId}/userConfigurations/${configName}" `
+                    -Uri "/users/${UserUPN}/mailFolders/inbox/userConfigurations/${configName}" `
                     -Body $updateBody `
                     -Beta
                 Write-Log "    UserConfiguration '$configName' updated successfully" -Level SUCCESS
@@ -638,7 +636,7 @@ function Set-RoamingSignature {
                 # Some configurations require PUT instead of PATCH
                 Invoke-GraphRequest `
                     -Method PUT `
-                    -Uri "/users/${UserUPN}/mailFolders/${inboxId}/userConfigurations/${configName}" `
+                    -Uri "/users/${UserUPN}/mailFolders/inbox/userConfigurations/${configName}" `
                     -Body $updateBody `
                     -Beta
                 Write-Log "    UserConfiguration '$configName' replaced via PUT" -Level SUCCESS

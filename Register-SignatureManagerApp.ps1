@@ -6,7 +6,7 @@
 .DESCRIPTION
     Creates a single-tenant app with:
       - MailboxConfigItem.ReadWrite (Graph Beta — roaming signatures)
-      - Mail.ReadWrite (Graph — mailbox access)
+      # Mail.ReadWrite NOT needed — inbox is a well-known folder name
       - User.Read.All (Graph — user properties)
       - MailboxSettings.ReadWrite (Graph — OOF and mailbox settings)
       - Exchange.ManageAsApp (Office 365 Exchange Online — EXO REST)
@@ -75,7 +75,6 @@ $exoSP   = Get-MgServicePrincipal -Filter "appId eq '$exoAppId'"
 # Graph delegated permissions
 $graphDelegatedPermissions = @(
     'MailboxConfigItem.ReadWrite'   # Roaming signatures via UserConfiguration API
-    'Mail.ReadWrite'                 # Mailbox access
     'User.Read.All'                  # User properties for variable replacement
     'MailboxSettings.ReadWrite'      # OOF messages and mailbox settings
     'offline_access'                 # Refresh token
@@ -88,7 +87,6 @@ $graphDelegatedPermissions = @(
 # Graph application permissions (for app-only/daemon flow)
 $graphAppPermissions = @(
     'MailboxConfigItem.ReadWrite'
-    'Mail.ReadWrite'
     'User.Read.All'
     'MailboxSettings.ReadWrite'
 )

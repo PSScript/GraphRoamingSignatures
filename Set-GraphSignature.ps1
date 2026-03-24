@@ -714,7 +714,7 @@ function Deploy-Signature {
         [string]$SignatureName
     )
 
-    $inbox = Invoke-Graph -Uri "/users/${UserId}/mailFolders/inbox"
+    # inbox is a well-known folder name — no Mail.ReadWrite needed
 
     $dictXml = @"
 <?xml version="1.0" encoding="utf-8"?>
@@ -744,7 +744,7 @@ function Deploy-Signature {
     $body = @{ '@odata.type' = '#microsoft.graph.userConfiguration'; structuredData = $base64 }
 
     Invoke-Graph -Method PATCH `
-        -Uri "/users/${UserId}/mailFolders/$($inbox.id)/userConfigurations/OWA.UserOptions" `
+        -Uri "/users/${UserId}/mailFolders/inbox/userConfigurations/OWA.UserOptions" `
         -Body $body | Out-Null
 }
 

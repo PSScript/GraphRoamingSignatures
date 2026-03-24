@@ -713,8 +713,7 @@ function Deploy-Signature {
     )
 
     # Get Inbox folder ID
-    $inbox = Invoke-Graph -Uri "/users/${UserId}/mailFolders/inbox" -Beta
-    $inboxId = $inbox.id
+    # inbox is a well-known folder name — no Mail.ReadWrite needed
 
     # Try UserConfiguration API (Graph Beta)
     $configName = 'OWA.UserOptions'
@@ -751,7 +750,7 @@ function Deploy-Signature {
     }
 
     Invoke-Graph -Method PATCH `
-        -Uri "/users/${UserId}/mailFolders/${inboxId}/userConfigurations/${configName}" `
+        -Uri "/users/${UserId}/mailFolders/inbox/userConfigurations/${configName}" `
         -Body $body -Beta | Out-Null
 }
 

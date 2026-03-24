@@ -155,7 +155,7 @@ export default function SignatureManager() {
 
   const psCommands = {
     roaming: `# Strategy: Roaming (Graph Beta UserConfiguration API)
-# Requires: MailboxConfigItem.ReadWrite, Mail.ReadWrite, User.Read.All
+# Requires: MailboxConfigItem.ReadWrite, User.Read.All
 .\\Manage-OutlookSignatures.ps1 \`
     -TenantId "YOUR-TENANT-ID" \`
     -ClientId "YOUR-CLIENT-ID" \`
@@ -190,7 +190,6 @@ export default function SignatureManager() {
 
 # Required Graph permissions:
 # - MailboxConfigItem.ReadWrite  (roaming sigs)
-# - Mail.ReadWrite               (mailbox access)
 # - User.Read.All                (user properties)
 # - MailboxSettings.ReadWrite    (OOF replies)
 # - Exchange.ManageAsApp         (transport rules)`
@@ -353,7 +352,6 @@ export default function SignatureManager() {
                   <tbody style={{ color:"var(--color-text-primary)" }}>
                     {[
                       ["MailboxConfigItem.ReadWrite", "Delegated+App", "Roaming signatures (UserConfiguration API)"],
-                      ["Mail.ReadWrite", "Delegated+App", "Mailbox access"],
                       ["User.Read.All", "Delegated+App", "User properties for template variables"],
                       ["MailboxSettings.ReadWrite", "Delegated+App", "OOF replies and mailbox settings"],
                       ["Exchange.ManageAsApp", "Application", "Transport rules, EXO InvokeCommand"],

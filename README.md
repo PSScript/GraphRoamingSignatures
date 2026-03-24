@@ -71,10 +71,12 @@ Oder manuell im [Entra Admin Center](https://entra.microsoft.com) anlegen.
 | Berechtigung | Typ | Wofür |
 |---|---|---|
 | `MailboxConfigItem.ReadWrite` | Delegiert + App | Roaming Signatures über UserConfiguration API |
-| `Mail.ReadWrite` | Delegiert + App | Postfachzugriff |
 | `User.Read.All` | Delegiert + App | Benutzerdaten für Variablen-Ersetzung |
-| `MailboxSettings.ReadWrite` | Delegiert + App | Abwesenheitsnachrichten |
-| `Exchange.ManageAsApp` | Application | Transport Rules, EXO InvokeCommand |
+| `MailboxSettings.ReadWrite` | Delegiert + App | Abwesenheitsnachrichten (optional) |
+| `Exchange.ManageAsApp` | Application | Transport Rules, EXO InvokeCommand (optional) |
+
+> `Mail.ReadWrite` wird **nicht** benötigt. Das Skript nutzt `inbox` als Well-Known Folder Name
+> und greift nur auf die UserConfiguration zu — nicht auf E-Mails.
 
 ### PowerShell
 
